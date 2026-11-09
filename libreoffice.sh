@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 #
 # LibreOffice Clean Install v2.0
