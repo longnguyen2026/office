@@ -2,11 +2,8 @@
 # ==============================================================================
 # Script: fix-upload-drive.sh
 # Repo:   longnguyen2026/office
-# Mô tả:  Khắc phục triệt để lỗi Google Drive không nhận diện file .xlsx, .docx, .pptx
-#         do WPS Office (Standard, Custom, Business) ghi đè MIME độc quyền trên Linux.
-#
-# Cách dùng trực tiếp qua GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh | sudo bash
+# Mô tả:  Khắc phục lỗi Google Drive không nhận diện file .xlsx, .docx, .pptx
+#         do WPS Office ghi đè MIME trên Linux (an toàn, không crash desktop).
 # ==============================================================================
 
 set -euo pipefail
@@ -28,7 +25,7 @@ Cách sử dụng:
 
 Tùy chọn:
   --check               Chỉ kiểm tra cấu hình MIME hiện tại
-  --users=u1,u2         Chỉ định danh sách user (mặc định: tự quét tất cả user UID >= 1000)
+  --users=u1,u2         Chỉ định danh sách user (mặc định: tự quét UID >= 1000)
   -h, --help            Hiển thị trợ giúp
 EOF
     exit 0
@@ -59,10 +56,10 @@ USER_LIST=($(get_user_list))
 fix_system() {
     log ">>> [1/2] Dọn dẹp MIME WPS & tạo Override chuẩn OpenXML trên hệ thống..."
     
-    # 1. Tắt toàn bộ tiến trình WPS đang chạy ngầm
-    pkill -9 -f 'wps|et|wpp|prometheus|kingsoft' 2>/dev/null || true
+    # 1. Đóng WPS an toàn bằng tên binary chính xác (không kill nhầm tiến trình desktop)
+    killall -q -w wps wpp et wpscloudsvr prometheus 2>/dev/null || true
 
-    # 2. Xóa triệt để các file XML nguồn của WPS (gồm cả business-office và custom-wps)
+    # 2. Xóa các file XML nguồn của WPS
     rm -f /usr/share/mime/packages/*business*.xml \
           /usr/share/mime/packages/*custom-wps*.xml \
           /usr/share/mime/packages/*wps*.xml \
@@ -72,7 +69,7 @@ fix_system() {
           /usr/share/mime/application/wps-office.*.xml \
           /usr/local/share/mime/application/wps-office.*.xml 2>/dev/null || true
 
-    # 3. Tạo file Override ép chuẩn OpenXML với trọng số ưu tiên cao nhất (weight=100)
+    # 3. Tạo Override với trọng số ưu tiên cao (weight=100)
     cat > /usr/share/mime/packages/00-override-openxml.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
@@ -94,23 +91,23 @@ fix_system() {
 </mime-info>
 EOF
 
-    # 4. Gỡ bỏ MIME wps-office khỏi các file .desktop để không tái tạo lại mimeinfo.cache
+    # 4. Gỡ bỏ MIME wps-office khỏi file .desktop
     for dt in /usr/share/applications/wps-office-*.desktop; do
         [ -f "$dt" ] || continue
         sed -i 's/application\/wps-office\.[^;]*;//g' "$dt"
     done
     command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database /usr/share/applications 2>/dev/null || true
 
-    # 5. Xóa compiled cache cũ và biên dịch lại toàn bộ database MIME hệ thống
+    # 5. Cập nhật lại MIME database hệ thống
     rm -f /usr/share/mime/globs /usr/share/mime/globs2 /usr/share/mime/mime.cache /usr/share/mime/types 2>/dev/null || true
     if command -v update-mime-database >/dev/null 2>&1; then
         update-mime-database /usr/share/mime >/dev/null 2>&1
         [ -d /usr/local/share/mime ] && update-mime-database /usr/local/share/mime >/dev/null 2>&1 || true
     else
-        die "Không tìm thấy lệnh update-mime-database (hệ thống thiếu gói shared-mime-info)."
+        die "Thiếu lệnh update-mime-database (gói shared-mime-info)."
     fi
 
-    # 6. Thiết lập template cho user tạo mới sau này trong /etc/skel
+    # 6. Thiết lập skel cho user mới
     mkdir -p /etc/skel/.config/Kingsoft
     cat > /etc/skel/.config/Kingsoft/Office.conf <<'EOF'
 [6.0]
@@ -148,32 +145,35 @@ fix_users() {
         [ -d "${home}" ] || continue
         owner="$(stat -c '%U:%G' "${home}" 2>/dev/null || echo "${u}:${u}")"
 
-        # Thiết lập cờ chặn WPS tự ghi đè MIME khi khởi động ứng dụng
         ensure_kingsoft_conf "${home}"
 
-        # Xóa sạch toàn bộ cache MIME cục bộ do WPS sinh ra trong thư mục user
         rm -rf "${home}/.local/share/mime"
         rm -f "${home}/.config/mimeapps.list" 2>/dev/null || true
 
-        # Phân quyền lại đúng cho user
         chown -R "${owner}" "${home}/.config/Kingsoft" 2>/dev/null || true
+
+        # Làm mới cache dịch vụ KDE nếu đang ở Kubuntu mà không ảnh hưởng session
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            sudo -u "${u}" -H kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            sudo -u "${u}" -H kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+        fi
+
         log "Đã xử lý: ${u}"
     done
 }
 
 verify_status() {
-    log "=== BẮT ĐẦU KIỂM TRA (VERIFY) ==="
+    log "=== KIỂM TRA ĐỊNH DẠNG MIME ==="
     local bad=0
 
-    # 1. Kiểm tra globs2 của hệ thống
     if grep -q 'wps-office' /usr/share/mime/globs2 2>/dev/null; then
         warn "Hệ thống: Vẫn còn MIME WPS trong /usr/share/mime/globs2!"
         bad=1
     else
-        log "Hệ thống: /usr/share/mime/globs2 sạch hoàn toàn."
+        log "Hệ thống: /usr/share/mime/globs2 chuẩn."
     fi
 
-    # 2. Kiểm tra trực tiếp từng user bằng file probe có header
     local u home
     for u in "${USER_LIST[@]}"; do
         id "${u}" >/dev/null 2>&1 || continue
@@ -202,7 +202,6 @@ verify_status() {
     return "${bad}"
 }
 
-# Khởi chạy quy trình
 if [ "${MODE}" = "check" ]; then
     verify_status && log "Hệ thống chuẩn!" || warn "Cần chạy fix!"
     exit $?
