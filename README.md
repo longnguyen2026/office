@@ -1,3 +1,8 @@
+# Lệnh cài WPS:
+````bash
+curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/wps.sh | bash
+````
+
 # Lệnh cài Libreoffice:
 ````bash
 curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/libreoffice.sh | bash
@@ -7,6 +12,7 @@ curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/libreoffi
 curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/libreoffice.sh -o /tmp/libreoffice.sh
 sudo bash /tmp/libreoffice.sh
 ```
+
 # Fix lỗi upload file xlsx, doc lên google drive và mở được file bằng goolge sheet, google doc
 ### WPS Office MIME Fix for Google Drive on Linux
 
