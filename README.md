@@ -15,7 +15,7 @@ Sửa lỗi khi upload file `.xlsx`, `.docx`, `.pptx` lên Google Drive từ Lin
 ### Nguyên nhân
 Khi cài đặt WPS Office trên Linux, phần mềm tự tạo MIME type độc quyền (`application/wps-office.*`). Khi kéo thả file lên trình duyệt (Chrome, Firefox), trình duyệt gửi MIME type này lên Google Drive thay vì định dạng chuẩn OpenXML (`application/vnd.openxmlformats-officedocument.*`).
 
-### Cách chạy nhanh (One-liner)
+### Chạy lệnh sau
 
 ```bash
 curl -fsSL [https://raw.githubusercontent.com/](https://raw.githubusercontent.com/)longnguyen2026/office/main/fix-upload-drive.sh | sudo bash
