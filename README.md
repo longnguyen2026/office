@@ -1,6 +1,6 @@
 # Lệnh cài WPS:
 ````bash
-curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/wps.sh | bash
+curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/wps.sh | sudo bash
 ````
 
 # Lệnh cài Libreoffice:
