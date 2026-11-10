@@ -2,23 +2,17 @@
 # ==============================================================================
 # Script: fix-upload-drive.sh
 # Repo:   longnguyen2026/office
-# Mô tả:  Khắc phục lỗi Google Drive không nhận diện file .xlsx, .docx, .pptx
-#         do WPS Office ghi đè MIME type trên hệ thống Linux.
+# Mô tả:  Khắc phục triệt để lỗi Google Drive không nhận diện file .xlsx, .docx, .pptx
+#         do WPS Office (Standard, Custom, Business) ghi đè MIME độc quyền trên Linux.
+#
+# Cách dùng trực tiếp qua GitHub:
+#   curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh | sudo bash
 # ==============================================================================
 
 set -euo pipefail
 
 MODE="fix"
 TARGET_USERS=""
-
-declare -A STANDARD_MIMES=(
-    ["xlsx"]="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ["docx"]="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ["pptx"]="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    ["xls"]="application/vnd.ms-excel"
-    ["doc"]="application/msword"
-    ["ppt"]="application/vnd.ms-powerpoint"
-)
 
 log()  { printf '\033[0;32m[INFO]\033[0m %s\n' "$*"; }
 warn() { printf '\033[0;33m[WARN]\033[0m %s\n' "$*" >&2; }
@@ -33,9 +27,9 @@ Cách sử dụng:
   sudo bash fix-upload-drive.sh [TÙY CHỌN]
 
 Tùy chọn:
-  --check               Chỉ kiểm tra cấu hình hệ thống và user, không chỉnh sửa
-  --users=u1,u2         Chỉ định danh sách user (mặc định: tự quét user UID >= 1000)
-  -h, --help            Hiển thị trợ giúp này
+  --check               Chỉ kiểm tra cấu hình MIME hiện tại
+  --users=u1,u2         Chỉ định danh sách user (mặc định: tự quét tất cả user UID >= 1000)
+  -h, --help            Hiển thị trợ giúp
 EOF
     exit 0
 }
@@ -49,7 +43,7 @@ for arg in "$@"; do
     esac
 done
 
-[ "$(id -u)" -eq 0 ] || die "Vui lòng chạy script với quyền sudo/root."
+[ "$(id -u)" -eq 0 ] || die "Script yêu cầu quyền root/sudo."
 
 get_user_list() {
     if [ -n "${TARGET_USERS}" ]; then
@@ -63,24 +57,66 @@ get_user_list() {
 USER_LIST=($(get_user_list))
 
 fix_system() {
-    log ">>> [1/2] Dọn dẹp MIME độc quyền của WPS trên hệ thống..."
-    rm -f /usr/share/mime/packages/wps-office-*.xml \
-          /usr/share/mime/packages/wps-office*.xml 2>/dev/null || true
-    rm -f /usr/share/mime/application/wps-office.*.xml 2>/dev/null || true
+    log ">>> [1/2] Dọn dẹp MIME WPS & tạo Override chuẩn OpenXML trên hệ thống..."
+    
+    # 1. Tắt toàn bộ tiến trình WPS đang chạy ngầm
+    pkill -9 -f 'wps|et|wpp|prometheus|kingsoft' 2>/dev/null || true
 
+    # 2. Xóa triệt để các file XML nguồn của WPS (gồm cả business-office và custom-wps)
+    rm -f /usr/share/mime/packages/*business*.xml \
+          /usr/share/mime/packages/*custom-wps*.xml \
+          /usr/share/mime/packages/*wps*.xml \
+          /usr/share/mime/packages/*kingsoft*.xml \
+          /usr/local/share/mime/packages/*wps*.xml \
+          /usr/local/share/mime/packages/*kingsoft*.xml \
+          /usr/share/mime/application/wps-office.*.xml \
+          /usr/local/share/mime/application/wps-office.*.xml 2>/dev/null || true
+
+    # 3. Tạo file Override ép chuẩn OpenXML với trọng số ưu tiên cao nhất (weight=100)
+    cat > /usr/share/mime/packages/00-override-openxml.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <comment>Microsoft Excel OpenXML Spreadsheet</comment>
+    <glob pattern="*.xlsx" weight="100"/>
+    <glob pattern="*.XLSX" weight="100"/>
+  </mime-type>
+  <mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+    <comment>Microsoft Word OpenXML Document</comment>
+    <glob pattern="*.docx" weight="100"/>
+    <glob pattern="*.DOCX" weight="100"/>
+  </mime-type>
+  <mime-type type="application/vnd.openxmlformats-officedocument.presentationml.presentation">
+    <comment>Microsoft PowerPoint OpenXML Presentation</comment>
+    <glob pattern="*.pptx" weight="100"/>
+    <glob pattern="*.PPTX" weight="100"/>
+  </mime-type>
+</mime-info>
+EOF
+
+    # 4. Gỡ bỏ MIME wps-office khỏi các file .desktop để không tái tạo lại mimeinfo.cache
+    for dt in /usr/share/applications/wps-office-*.desktop; do
+        [ -f "$dt" ] || continue
+        sed -i 's/application\/wps-office\.[^;]*;//g' "$dt"
+    done
+    command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database /usr/share/applications 2>/dev/null || true
+
+    # 5. Xóa compiled cache cũ và biên dịch lại toàn bộ database MIME hệ thống
+    rm -f /usr/share/mime/globs /usr/share/mime/globs2 /usr/share/mime/mime.cache /usr/share/mime/types 2>/dev/null || true
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database /usr/share/mime >/dev/null 2>&1
+        [ -d /usr/local/share/mime ] && update-mime-database /usr/local/share/mime >/dev/null 2>&1 || true
+    else
+        die "Không tìm thấy lệnh update-mime-database (hệ thống thiếu gói shared-mime-info)."
+    fi
+
+    # 6. Thiết lập template cho user tạo mới sau này trong /etc/skel
     mkdir -p /etc/skel/.config/Kingsoft
     cat > /etc/skel/.config/Kingsoft/Office.conf <<'EOF'
 [6.0]
 common\do_not_detect_file_association_while_startup=true
 EOF
     chmod 0644 /etc/skel/.config/Kingsoft/Office.conf
-
-    if command -v update-mime-database >/dev/null 2>&1; then
-        update-mime-database /usr/share/mime >/dev/null 2>&1
-        log "Đã cập nhật cơ sở dữ liệu MIME hệ thống (/usr/share/mime)."
-    else
-        die "Thiếu công cụ update-mime-database (gói shared-mime-info)."
-    fi
 }
 
 ensure_kingsoft_conf() {
@@ -103,7 +139,7 @@ ensure_kingsoft_conf() {
 }
 
 fix_users() {
-    log ">>> [2/2] Cấu hình chống tái tạo MIME cho từng người dùng..."
+    log ">>> [2/2] Cấu hình chống tái tạo MIME cho các user..."
     local u home owner
 
     for u in "${USER_LIST[@]}"; do
@@ -112,47 +148,42 @@ fix_users() {
         [ -d "${home}" ] || continue
         owner="$(stat -c '%U:%G' "${home}" 2>/dev/null || echo "${u}:${u}")"
 
-        pkill -u "${u}" -f 'wps|et|wpp|prometheus|kingsoft' 2>/dev/null || true
-
+        # Thiết lập cờ chặn WPS tự ghi đè MIME khi khởi động ứng dụng
         ensure_kingsoft_conf "${home}"
 
-        rm -f "${home}/.local/share/mime/packages/Override.xml" 2>/dev/null || true
-        rm -f "${home}/.local/share/mime/packages/"*wps* 2>/dev/null || true
-        rm -f "${home}/.local/share/mime/application/wps-office.*.xml" 2>/dev/null || true
+        # Xóa sạch toàn bộ cache MIME cục bộ do WPS sinh ra trong thư mục user
+        rm -rf "${home}/.local/share/mime"
+        rm -f "${home}/.config/mimeapps.list" 2>/dev/null || true
 
-        if [ -d "${home}/.local/share/mime" ]; then
-            if command -v update-mime-database >/dev/null 2>&1; then
-                sudo -u "${u}" -H update-mime-database "${home}/.local/share/mime" >/dev/null 2>&1 || true
-            fi
-        fi
-
+        # Phân quyền lại đúng cho user
         chown -R "${owner}" "${home}/.config/Kingsoft" 2>/dev/null || true
-        [ -d "${home}/.local/share/mime" ] && chown -R "${owner}" "${home}/.local/share/mime" 2>/dev/null || true
-
-        log "Đã xử lý xong cho user: ${u}"
+        log "Đã xử lý: ${u}"
     done
 }
 
 verify_status() {
-    log "=== KIỂM TRA ĐỊNH DẠNG MIME ==="
+    log "=== BẮT ĐẦU KIỂM TRA (VERIFY) ==="
     local bad=0
 
+    # 1. Kiểm tra globs2 của hệ thống
     if grep -q 'wps-office' /usr/share/mime/globs2 2>/dev/null; then
-        warn "Hệ thống: Vẫn còn ánh xạ WPS trong /usr/share/mime/globs2"
+        warn "Hệ thống: Vẫn còn MIME WPS trong /usr/share/mime/globs2!"
         bad=1
     else
-        log "Hệ thống: /usr/share/mime/globs2 sạch, không còn wps-office.*"
+        log "Hệ thống: /usr/share/mime/globs2 sạch hoàn toàn."
     fi
 
+    # 2. Kiểm tra trực tiếp từng user bằng file probe có header
     local u home
     for u in "${USER_LIST[@]}"; do
         id "${u}" >/dev/null 2>&1 || continue
         home="$(getent passwd "${u}" | cut -d: -f6)"
         [ -d "${home}" ] || continue
 
-        local tmp_xlsx="${home}/.probe_test.xlsx"
-        local tmp_docx="${home}/.probe_test.docx"
-        touch "${tmp_xlsx}" "${tmp_docx}"
+        local tmp_xlsx="${home}/.probe.xlsx"
+        local tmp_docx="${home}/.probe.docx"
+        echo "PK" > "${tmp_xlsx}"
+        echo "PK" > "${tmp_docx}"
         chown "${u}:${u}" "${tmp_xlsx}" "${tmp_docx}" 2>/dev/null || true
 
         local got_xlsx got_docx
@@ -161,7 +192,7 @@ verify_status() {
         rm -f "${tmp_xlsx}" "${tmp_docx}"
 
         if [[ "${got_xlsx}" == *"wps-office"* ]] || [[ "${got_docx}" == *"wps-office"* ]]; then
-            warn "User ${u}: Vẫn bị gán MIME wps-office (${got_xlsx})"
+            warn "User ${u}: Vẫn dính MIME WPS (${got_xlsx})"
             bad=1
         else
             log "User ${u}: xlsx -> ${got_xlsx:-OK} | docx -> ${got_docx:-OK}"
@@ -171,12 +202,13 @@ verify_status() {
     return "${bad}"
 }
 
+# Khởi chạy quy trình
 if [ "${MODE}" = "check" ]; then
-    verify_status && log "Trạng thái: Tốt! Không phát hiện lỗi MIME." || warn "Trạng thái: Phát hiện lỗi MIME, cần chạy fix."
+    verify_status && log "Hệ thống chuẩn!" || warn "Cần chạy fix!"
     exit $?
 fi
 
 fix_system
 fix_users
 verify_status
-log "Hoàn tất! Người dùng có thể kéo thả upload file lên Google Drive bình thường."
+log "Hoàn tất! Hệ thống đã chuẩn hóa MIME OpenXML cho Google Drive."
