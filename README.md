@@ -8,7 +8,7 @@ curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/libreoffi
 sudo bash /tmp/libreoffice.sh
 ```
 # Fix lỗi upload file xlsx, doc lên google drive và mở được file bằng goolge sheet, google doc
-## WPS Office MIME Fix for Google Drive on Linux
+### WPS Office MIME Fix for Google Drive on Linux
 
 Sửa lỗi khi upload file `.xlsx`, `.docx`, `.pptx` lên Google Drive từ Linux bị biến thành file không rõ định dạng, không mở được trực tiếp bằng Google Docs / Google Sheets.
 
