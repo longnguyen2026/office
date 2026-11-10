@@ -18,5 +18,5 @@ Khi cài đặt WPS Office trên Linux, phần mềm tự tạo MIME type độc
 ### Cách chạy nhanh (One-liner)
 
 ```bash
-curl -fsSL [https://raw.githubusercontent.com/](https://raw.githubusercontent.com/)longnguyen2026/office/main/fix-wps-drive.sh | sudo bash
+curl -fsSL [https://raw.githubusercontent.com/](https://raw.githubusercontent.com/)longnguyen2026/office/main/fix-upload-drive.sh | sudo bash
 ````
