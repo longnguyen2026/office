@@ -117,3 +117,14 @@ else
     log_err "Cài đặt thất bại, không tìm thấy phiên bản cài đặt."
     exit 1
 fi
+
+# ==============================================================================
+# # 9. TỰ ĐỘNG FIX LỖI UPLOAD GOOGLE DRIVE (MIME TYPE XLSX / DOCX)
+# ==============================================================================
+echo ""
+log_info "Áp dụng bản vá MIME type cho Google Drive..."
+if curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh" | bash; then
+    log_success "Đã cấu hình và cập nhật MIME database thành công!"
+else
+    log_warn "Không thể tự động fix upload Drive (kiểm tra lại kết nối mạng)."
+fi
