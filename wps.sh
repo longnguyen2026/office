@@ -40,7 +40,6 @@ fi
 rm -f /usr/share/mime/packages/custom-wps-office.xml
 update-mime-database /usr/share/mime 2>/dev/null || true
 
-
 # 5. Tải gói cài đặt WPS Office từ GitHub Releases
 DOWNLOAD_URL="https://github.com/longnguyen2026/office/releases/download/v12.1.2.29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
 
@@ -56,7 +55,6 @@ if ! dpkg-deb -I "$TMP_DEB" >/dev/null 2>&1; then
     exit 1
 fi
 echo -e "${GREEN}[SUCCESS] Tải thành công file DEB hợp lệ.${NC}"
-
 
 # 6. Cài đặt WPS Office mới
 echo -e "${CYAN}[INFO] Bắt đầu cài đặt WPS Office mới...${NC}"
@@ -78,7 +76,7 @@ fi
 
 # 8. Chạy script vá lỗi định dạng MIME upload Google Drive
 echo -e "${CYAN}[INFO] Áp dụng bản vá MIME upload Google Drive (fix-upload-drive.sh)...${NC}"
-curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh" | bash || true
+curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?$(date +%s)" | sudo bash || true
 
 # 9. Cập nhật lại cache hệ thống
 update-desktop-database /usr/share/applications 2>/dev/null || true
