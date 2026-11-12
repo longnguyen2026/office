@@ -41,30 +41,22 @@ rm -f /usr/share/mime/packages/custom-wps-office.xml
 update-mime-database /usr/share/mime 2>/dev/null || true
 
 
-# 5. Lấy link tải WPS Office bản 12 mới nhất (ép dùng mirror OBS không bị chặn 403)
-echo -e "${CYAN}[INFO] Đang tìm link tải WPS Office bản mới nhất...${NC}"
-UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-REF="https://linux.wps.cn/"
-FALLBACK_URL="https://pubwps-wps365-obs.wpscdn.cn/download/Linux/29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
-
-LATEST_RAW=$(curl -fsSL -A "$UA" --connect-timeout 10 "$REF" | grep -oE 'https://[^"]+_amd64\.deb' | head -n 1 || true)
-
-if [ -n "$LATEST_RAW" ]; then
-    BUILD_NUM=$(echo "$LATEST_RAW" | grep -oE '/[0-9]{5}/' | tr -d '/' | head -n 1)
-    FILE_NAME=$(basename "$LATEST_RAW")
-    if [ -n "$BUILD_NUM" ] && [ -n "$FILE_NAME" ]; then
-        DOWNLOAD_URL="https://pubwps-wps365-obs.wpscdn.cn/download/Linux/${BUILD_NUM}/${FILE_NAME}"
-    else
-        DOWNLOAD_URL="$FALLBACK_URL"
-    fi
-else
-    DOWNLOAD_URL="$FALLBACK_URL"
-fi
+# 5. Tải gói cài đặt WPS Office từ GitHub Releases
+DOWNLOAD_URL="https://github.com/longnguyen2026/office/releases/download/v12.1.2.29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
 
 TMP_DEB="/tmp/wps-office-latest.deb"
 rm -f "$TMP_DEB"
-echo -e "${CYAN}[INFO] Đang tải từ: $DOWNLOAD_URL${NC}"
-curl -fL -A "$UA" -e "$REF" --progress-bar "$DOWNLOAD_URL" -o "$TMP_DEB"
+echo -e "${CYAN}[INFO] Đang tải gói cài đặt từ: $DOWNLOAD_URL${NC}"
+curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DEB"
+
+# Kiểm tra tính hợp lệ của file DEB vừa tải
+if ! dpkg-deb -I "$TMP_DEB" >/dev/null 2>&1; then
+    echo -e "${RED}[ERROR] File DEB tải về bị lỗi hoặc không hợp lệ!${NC}"
+    rm -f "$TMP_DEB"
+    exit 1
+fi
+echo -e "${GREEN}[SUCCESS] Tải thành công file DEB hợp lệ.${NC}"
+
 
 # 6. Cài đặt WPS Office mới
 echo -e "${CYAN}[INFO] Bắt đầu cài đặt WPS Office mới...${NC}"
