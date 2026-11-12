@@ -40,26 +40,34 @@ fi
 rm -f /usr/share/mime/packages/custom-wps-office.xml
 update-mime-database /usr/share/mime 2>/dev/null || true
 
-# 5. Lấy link tải WPS Office bản 12 mới nhất (kèm header vượt chặn 403)
+# 5. Tải gói cài đặt WPS Office bản 12 mới nhất (dùng OBS mirror tránh lỗi 403)
 echo -e "${CYAN}[INFO] Đang tìm link tải WPS Office bản mới nhất...${NC}"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 REF="https://linux.wps.cn/"
+OBS_URL="https://pubwps-wps365-obs.wpscdn.cn/download/Linux/29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
 
-FALLBACK_URL="https://pubwps-wps365-obs.wpscdn.cn/download/Linux/29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
-LATEST_URL=$(curl -fsSL -A "$UA" --connect-timeout 10 "$REF" | grep -oE 'https://[^"]+_amd64\.deb' | head -n 1 || true)
+# Lấy tên file mới nhất từ trang chủ và ghép vào server OBS không bị chặn 403
+LATEST_RAW=$(curl -fsSL -A "$UA" --connect-timeout 10 "$REF" | grep -oE 'https://[^"]+_amd64\.deb' | head -n 1 || true)
+if [ -n "$LATEST_RAW" ]; then
+    BUILD_NUM=$(echo "$LATEST_RAW" | grep -oE '/[0-9]{5}/' | tr -d '/' | head -n 1)
+    FILE_NAME=$(basename "$LATEST_RAW")
+    if [ -n "$BUILD_NUM" ] && [ -n "$FILE_NAME" ]; then
+        DOWNLOAD_URL="https://pubwps-wps365-obs.wpscdn.cn/download/Linux/${BUILD_NUM}/${FILE_NAME}"
+    else
+        DOWNLOAD_URL="$OBS_URL"
+    fi
+else
+    DOWNLOAD_URL="$OBS_URL"
+fi
 
 TMP_DEB="/tmp/wps-office-latest.deb"
 rm -f "$TMP_DEB"
+echo -e "${CYAN}[INFO] Đang tải từ: $DOWNLOAD_URL${NC}"
 
-if [ -n "$LATEST_URL" ]; then
-    echo -e "${CYAN}[INFO] Đang tải từ: $LATEST_URL${NC}"
-    if ! curl -fL -A "$UA" -e "$REF" --progress-bar "$LATEST_URL" -o "$TMP_DEB"; then
-        echo -e "${YELLOW}[WARN] Link chính bị chặn (403), chuyển sang tải từ link dự phòng...${NC}"
-        curl -fL -A "$UA" -e "$REF" --progress-bar "$FALLBACK_URL" -o "$TMP_DEB"
-    fi
-else
-    echo -e "${YELLOW}[WARN] Không lấy được link động, dùng bản ổn định 12.1.2.29183...${NC}"
-    curl -fL -A "$UA" -e "$REF" --progress-bar "$FALLBACK_URL" -o "$TMP_DEB"
+if ! curl -fL -A "$UA" -e "$REF" --progress-bar "$DOWNLOAD_URL" -o "$TMP_DEB"; then
+    echo -e "${YELLOW}[WARN] Thử lại bằng link dự phòng OBS...${NC}"
+    rm -f "$TMP_DEB"
+    curl -fL -A "$UA" -e "$REF" --progress-bar "$OBS_URL" -o "$TMP_DEB"
 fi
 
 # 6. Cài đặt WPS Office mới
