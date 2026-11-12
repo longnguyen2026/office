@@ -40,17 +40,31 @@ fi
 rm -f /usr/share/mime/packages/custom-wps-office.xml
 update-mime-database /usr/share/mime 2>/dev/null || true
 
-# 5. Tải gói cài đặt WPS Office từ GitHub Releases
-DOWNLOAD_URL="https://github.com/longnguyen2026/office/releases/download/v12.1.2.29183/wps-office_12.1.2.29183.AK.preread.sw.Personal_806791_amd64.deb"
-
+# 5. Tải gói cài đặt WPS Office từ Google Drive
+GDRIVE_ID="1jqo0D8A7snDaypXO2iPt1ceugEwlxk94"
 TMP_DEB="/tmp/wps-office-latest.deb"
 rm -f "$TMP_DEB"
-echo -e "${CYAN}[INFO] Đang tải gói cài đặt từ: $DOWNLOAD_URL${NC}"
-curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DEB"
+
+echo -e "${CYAN}[INFO] Đang tải gói cài đặt WPS Office từ Google Drive...${NC}"
+
+# Cài gdown nếu chưa có để vượt qua trang cảnh báo file lớn (>100MB) của Google Drive
+if ! command -v gdown >/dev/null 2>&1; then
+    apt-get update -qq
+    apt-get install -y -qq python3-pip >/dev/null 2>&1 || true
+    pip3 install --break-system-packages -q gdown 2>/dev/null || pip3 install -q gdown 2>/dev/null || true
+fi
+
+if command -v gdown >/dev/null 2>&1; then
+    gdown "https://drive.google.com/uc?id=${GDRIVE_ID}" -O "$TMP_DEB"
+else
+    # Phương án dự phòng bằng curl nếu máy không cài được gdown
+    curl -fL -c /tmp/gcookie "https://drive.usercontent.google.com/download?id=${GDRIVE_ID}&export=download&confirm=t" -o "$TMP_DEB"
+    rm -f /tmp/gcookie
+fi
 
 # Kiểm tra tính hợp lệ của file DEB vừa tải
 if ! dpkg-deb -I "$TMP_DEB" >/dev/null 2>&1; then
-    echo -e "${RED}[ERROR] File DEB tải về bị lỗi hoặc không hợp lệ!${NC}"
+    echo -e "${RED}[ERROR] File tải từ Google Drive không hợp lệ (kiểm tra lại quyền chia sẻ công khai của file)!${NC}"
     rm -f "$TMP_DEB"
     exit 1
 fi
@@ -76,7 +90,7 @@ fi
 
 # 8. Chạy script vá lỗi định dạng MIME upload Google Drive
 echo -e "${CYAN}[INFO] Áp dụng bản vá MIME upload Google Drive (fix-upload-drive.sh)...${NC}"
-curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?$(date +%s)" | sudo bash || true
+curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?nocache=$RANDOM" | sudo bash || true
 
 # 9. Cập nhật lại cache hệ thống
 update-desktop-database /usr/share/applications 2>/dev/null || true
