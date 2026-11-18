@@ -90,10 +90,41 @@ fi
 
 # 8. Chạy script vá lỗi định dạng MIME upload Google Drive
 echo -e "${CYAN}[INFO] Áp dụng bản vá MIME upload Google Drive (fix-upload-drive.sh)...${NC}"
-curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?nocache=$RANDOM" | sudo bash || true
+curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?nocache=$RANDOM" | bash -s || true
 
-# 9. Cập nhật lại cache hệ thống
+# ==============================================================================
+# [BỔ SUNG 1] VÁ LỖI BỘ GÕ TIẾNG VIỆT (IBUS / FCITX5) TRONG WPS OFFICE
+# Vị trí: Ngay sau khi cài đặt WPS và fix MIME (sau Bước 8)
+# ==============================================================================
+echo -e "${CYAN}[INFO] Cấu hình biến môi trường bộ gõ tiếng Việt cho WPS Office...${NC}"
+for app in wps et wpp wpspdf; do
+    if [ -f "/usr/bin/$app" ] && ! grep -q "QT_IM_MODULE" "/usr/bin/$app"; then
+        sed -i '2i export XMODIFIERS="@im=ibus"\nexport QT_IM_MODULE="ibus"' "/usr/bin/$app"
+    fi
+done
+
+# ==============================================================================
+# [BỔ SUNG 2] CẬP NHẬT TOÀN BỘ CACHE HỆ THỐNG & ICON THEME (THAY THẾ BƯỚC 9 CŨ)
+# Vị trí: Thay thế cho Bước 9 cũ để sửa lỗi icon bánh răng trên Linux Mint
+# ==============================================================================
+echo -e "${CYAN}[INFO] Cập nhật lại cache ứng dụng, MIME và toàn bộ Icon theme...${NC}"
 update-desktop-database /usr/share/applications 2>/dev/null || true
 update-mime-database /usr/share/mime 2>/dev/null || true
+
+# Quét làm mới tất cả thư mục icon (Mint-Y, hicolor, WhiteSur...) thay vì chỉ hicolor
+for theme_dir in /usr/share/icons/*; do
+    [ -d "$theme_dir" ] && gtk-update-icon-cache -f -t "$theme_dir" 2>/dev/null || true
+done
+
+# ==============================================================================
+# [BỔ SUNG 3] KHỞI ĐỘNG LẠI BỘ GÕ CHO USER HIỆN TẠI ĐỂ GÕ ĐƯỢC NGAY KHÔNG CẦN REBOOT
+# Vị trí: Cuối cùng, ngay trước thông báo hoàn tất
+# ==============================================================================
+if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+    USER_ID=$(id -u "$REAL_USER")
+    if [ -S "/run/user/$USER_ID/bus" ]; then
+        sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" ibus restart 2>/dev/null || true
+    fi
+fi
 
 echo -e "${GREEN}[SUCCESS] Hoàn tất cài đặt và cấu hình WPS Office!${NC}"
