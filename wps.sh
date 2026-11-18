@@ -93,18 +93,37 @@ echo -e "${CYAN}[INFO] Áp dụng bản vá MIME upload Google Drive (fix-upload
 curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?nocache=$RANDOM" | bash -s || true
 
 # ==============================================================================
-# [BỔ SUNG 1] VÁ LỖI BỘ GÕ TIẾNG VIỆT (IBUS / FCITX5) TRONG WPS OFFICE
+# [BỔ SUNG 1] CHỈ VÁ LỖI BỘ GÕ NẾU MÁY ĐANG DÙNG IBUS-BAMBOO (BỎ QUA FCITX5/VDKEY)
 # ==============================================================================
-echo -e "${CYAN}[INFO] Cấu hình biến môi trường bộ gõ tiếng Việt cho WPS Office...${NC}"
-for app in wps et wpp wpspdf; do
-    TARGET_BIN=$(readlink -f "/usr/bin/$app" 2>/dev/null || true)
-    # Chỉ chèn nếu file đích là shell script (có dòng đầu bắt đầu bằng #!)
-    if [ -f "$TARGET_BIN" ] && head -n 1 "$TARGET_BIN" | grep -q "^#!"; then
-        if ! grep -q "QT_IM_MODULE" "$TARGET_BIN"; then
-            sed -i '2i export XMODIFIERS="@im=ibus"\nexport QT_IM_MODULE="ibus"' "$TARGET_BIN"
+IS_FCITX5=false
+if pgrep -x "fcitx5" >/dev/null 2>&1 || dpkg -l 2>/dev/null | grep -qE '^ii\s+(fcitx5|vdkey|fcitx5-ngosen|fcitx5-lotus)'; then
+    IS_FCITX5=true
+fi
+
+if [ "$IS_FCITX5" = false ] && (dpkg -l 2>/dev/null | grep -qw "ibus-bamboo" || pgrep -x "ibus-daemon" >/dev/null 2>&1); then
+    echo -e "${CYAN}[INFO] Phát hiện bộ gõ IBus (ibus-bamboo), đang cấu hình tương thích cho WPS Office...${NC}"
+    
+    # 1. Chèn biến môi trường IBus vào file khởi chạy nếu là shell script
+    for app in wps et wpp wpspdf; do
+        TARGET_BIN=$(readlink -f "/usr/bin/$app" 2>/dev/null || true)
+        if [ -f "$TARGET_BIN" ] && head -n 1 "$TARGET_BIN" | grep -q "^#!"; then
+            if ! grep -q "QT_IM_MODULE" "$TARGET_BIN"; then
+                sed -i '2i export XMODIFIERS="@im=ibus"\nexport QT_IM_MODULE="ibus"' "$TARGET_BIN"
+            fi
+        fi
+    done
+
+    # 2. Khởi động lại IBus cho user hiện tại để nhận diện ngay không cần reboot
+    if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+        USER_ID=$(id -u "$REAL_USER")
+        if [ -S "/run/user/$USER_ID/bus" ]; then
+            sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" ibus restart 2>/dev/null || true
         fi
     fi
-done
+else
+    echo -e "${CYAN}[INFO] Hệ thống đang dùng Fcitx5/VDKey hoặc không dùng IBus, bỏ qua bước vá IBus.${NC}"
+fi
+
 # ==============================================================================
 # [BỔ SUNG 2] CẬP NHẬT TOÀN BỘ CACHE HỆ THỐNG & ICON THEME (THAY THẾ BƯỚC 9 CŨ)
 # Vị trí: Thay thế cho Bước 9 cũ để sửa lỗi icon bánh răng trên Linux Mint
