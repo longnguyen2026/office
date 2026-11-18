@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Màu sắc hiển thị log
+# Màu sắc hiển thị log 18.11.2026
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
