@@ -94,15 +94,17 @@ curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upl
 
 # ==============================================================================
 # [BỔ SUNG 1] VÁ LỖI BỘ GÕ TIẾNG VIỆT (IBUS / FCITX5) TRONG WPS OFFICE
-# Vị trí: Ngay sau khi cài đặt WPS và fix MIME (sau Bước 8)
 # ==============================================================================
 echo -e "${CYAN}[INFO] Cấu hình biến môi trường bộ gõ tiếng Việt cho WPS Office...${NC}"
 for app in wps et wpp wpspdf; do
-    if [ -f "/usr/bin/$app" ] && ! grep -q "QT_IM_MODULE" "/usr/bin/$app"; then
-        sed -i '2i export XMODIFIERS="@im=ibus"\nexport QT_IM_MODULE="ibus"' "/usr/bin/$app"
+    TARGET_BIN=$(readlink -f "/usr/bin/$app" 2>/dev/null || true)
+    # Chỉ chèn nếu file đích là shell script (có dòng đầu bắt đầu bằng #!)
+    if [ -f "$TARGET_BIN" ] && head -n 1 "$TARGET_BIN" | grep -q "^#!"; then
+        if ! grep -q "QT_IM_MODULE" "$TARGET_BIN"; then
+            sed -i '2i export XMODIFIERS="@im=ibus"\nexport QT_IM_MODULE="ibus"' "$TARGET_BIN"
+        fi
     fi
 done
-
 # ==============================================================================
 # [BỔ SUNG 2] CẬP NHẬT TOÀN BỘ CACHE HỆ THỐNG & ICON THEME (THAY THẾ BƯỚC 9 CŨ)
 # Vị trí: Thay thế cho Bước 9 cũ để sửa lỗi icon bánh răng trên Linux Mint
