@@ -1,9 +1,13 @@
-# Lệnh cài WPS:
+## Lệnh cài WPS:
 ````bash
 curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/wps.sh | sudo bash
 ````
+Lệnh cài add-in đổi số thành chữ
+````bash
+curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/doiso-wps.sh | sudo bash
+````
 
-# Lệnh cài Libreoffice:
+## Lệnh cài Libreoffice:
 ````bash
 curl -sSL https://raw.githubusercontent.com/longnguyen2026/office/main/libreoffice.sh | bash
 ````
