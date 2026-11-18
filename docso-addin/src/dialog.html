@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Đọc số thành chữ</title>
+<style>
+  body { font-family: sans-serif; font-size: 14px; margin: 16px; color: #222; }
+  h3 { margin: 0 0 12px; }
+  label { display: block; margin: 10px 0 4px; }
+  input[type=text] { width: 150px; padding: 5px; font-size: 14px; }
+  button { padding: 6px 14px; font-size: 14px; margin-right: 6px; cursor: pointer; }
+  .row { margin-top: 14px; }
+  #kq { margin-top: 14px; min-height: 40px; }
+  .ok { color: #0a7d33; } .loi { color: #c0392b; } .canh { color: #b9770e; }
+  .goiy { color: #666; font-size: 12px; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <h3>Đọc số thành chữ</h3>
+  <div>Ô nguồn: <b id="nguon"></b></div>
+
+  <label for="dich">Ô đích (ô đầu tiên để điền chữ)</label>
+  <input type="text" id="dich">
+  <button id="btnLay" type="button">Lấy ô đang chọn</button>
+  <div class="goiy">Gõ địa chỉ (vd: B1), hoặc bấm vào ô trên bảng tính rồi bấm "Lấy ô đang chọn".</div>
+
+  <label><input type="checkbox" id="dong" checked> Thêm chữ "đồng"</label>
+
+  <div class="row">
+    <button id="btnDien" type="button">Điền</button>
+    <button id="btnDong" type="button">Đóng</button>
+  </div>
+  <div id="kq"></div>
+
+  <script src="js/docso.js"></script>
+  <script src="js/dialog.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
+  <ribbon startFromScratch="false">
+    <tabs>
+      <tab id="tabDocSo" label="Đọc số">
+        <group id="grpChon" label="Đọc số">
+          <button id="btnDocSo" label="Đọc số..." size="large" onAction="OnAction"/>
+        </group>
+        <group id="grpThuCong" label="Thủ công (dự phòng)">
+          <button id="btnLayNguon" label="1. Lấy ô nguồn" size="large" onAction="OnAction"/>
+          <button id="btnDienDong" label="2. Điền (+ đồng)" size="large" onAction="OnAction"/>
+          <button id="btnDienThuong" label="2. Điền (thường)" size="large" onAction="OnAction"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
