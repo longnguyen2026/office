@@ -1,35 +1,6 @@
 #!/bin/bash
 set -e
 
-# Màu sắc hiển thị log
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-# 1. Kiểm tra quyền root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}[ERROR] Vui lòng chạy script bằng quyền sudo (sudo bash wps.sh)${NC}"
-    exit 1
-fi
-
-echo -e "${CYAN}[INFO] Bắt đầu quy trình kiểm tra và nâng cấp WPS Office...${NC}"
-
-# 2. Dừng các tiến trình WPS đang chạy ngầm
-echo -e "${CYAN}[INFO] Dừng các tiến trình WPS đang chạy ngầm...${NC}"
-killall -9 wps wpp et wpspdf wpscloudsvr 2>/dev/null || true
-
-# 3. Gỡ bỏ triệt để mọi phiên bản WPS cũ (DEB, Snap, Flatpak)
-echo -e "${CYAN}[INFO] Kiểm tra và gỡ bỏ các bản WPS Office cũ...${NC}"
-if dpkg -l | grep -qw wps-office; then
-    echo -e "${YELLOW}[INFO] Phát hiện gói DEB wps-office cũ, đang tiến hành gỡ bỏ...${NC}"
-    apt-get purge -y wps-office 2>/dev/null || dpkg --purge --force-all wps-office 2>/dev/null || true
-    apt-get autoremove -y 2>/dev/null || true
-fi#!/bin/bash
-set -e
-
-# Màu sắc hiển thị log 18.11.2026
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -55,39 +26,6 @@ if dpkg -l | grep -qw wps-office; then
     apt-get purge -y wps-office 2>/dev/null || dpkg --purge --force-all wps-office 2>/dev/null || true
     apt-get autoremove -y 2>/dev/null || true
 fi
-
-if command -v snap >/dev/null 2>&1 && snap list 2>/dev/null | grep -qw wps-office; then
-    snap remove wps-office 2>/dev/null || true
-fi
-
-if command -v flatpak >/dev/null 2>&1 && flatpak list 2>/dev/null | grep -q com.wps.Office; then
-    flatpak uninstall -y com.wps.Office 2>/dev/null || true
-fi
-
-# 4. Dọn sạch file MIME lỗi rỗng gây kẹt dpkg
-rm -f /usr/share/mime/packages/custom-wps-office.xml
-update-mime-database /usr/share/mime 2>/dev/null || true
-
-# 5. Tải gói cài đặt WPS Office từ Google Drive (lưu vào /var/tmp trên ổ đĩa để tránh tốn RAM tmpfs)
-GDRIVE_ID="1jqo0D8A7snDaypXO2iPt1ceugEwlxk94"
-TMP_DEB="/var/tmp/wps-office-latest.deb"
-rm -f "$TMP_DEB"
-
-echo -e "${CYAN}[INFO] Đang tải gói cài đặt WPS Office từ Google Drive...${NC}"
-
-if ! command -v gdown >/dev/null 2>&1; then
-    apt-get update -qq
-    apt-get install -y -qq python3-pip >/dev/null 2>&1 || true
-    pip3 install --break-system-packages -q gdown 2>/dev/null || pip3 install -q gdown 2>/dev/null || true
-fi
-
-if command -v gdown >/dev/null 2>&1; then
-    gdown "https://drive.google.com/uc?id=${GDRIVE_ID}" -O "$TMP_DEB" || true
-fi
-
-# Nếu gdown không có hoặc tải thất bại thì dùng curl dự phòng
-if [ ! -s "$TMP_DEB" ]; then
-
 
 if command -v snap >/dev/null 2>&1 && snap list 2>/dev/null | grep -qw wps-office; then
     snap remove wps-office 2>/dev/null || true
@@ -142,27 +80,33 @@ dpkg -i "$TMP_DEB" || {
 }
 rm -f "$TMP_DEB"
 
-# 7. Cấu hình giao diện tiếng Anh (en_US) & dọn shortcut cục bộ cũ (2019) của user
-REAL_USER=${SUDO_USER:-$USER}
-USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
-if [ -n "$USER_HOME" ] && [ -d "$USER_HOME" ]; then
+# 7. Cấu hình giao diện tiếng Anh (en_US) & dọn shortcut cục bộ cũ (2019) cho toàn bộ user
+for USER_HOME in /home/*; do
+    [ -d "$USER_HOME" ] || continue
+    TARGET_USER=$(basename "$USER_HOME")
+    id "$TARGET_USER" &>/dev/null || continue
+
     mkdir -p "$USER_HOME/.config/Kingsoft"
     cat << 'EOF' > "$USER_HOME/.config/Kingsoft/Office.conf"
 [General]
 languages=en_US
 EOF
-    chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config/Kingsoft"
+    chown -R "$TARGET_USER:$TARGET_USER" "$USER_HOME/.config/Kingsoft"
 
     # Xóa shortcut cũ trong thư mục user để tránh đè icon mới của bản 2023 (12.1.2)
     rm -f "$USER_HOME/.local/share/applications"/wps-office*.desktop
     rm -f "$USER_HOME/Desktop"/wps-office*.desktop
-fi
+done
 
 # 8. Chạy script vá lỗi định dạng MIME upload Google Drive
 echo -e "${CYAN}[INFO] Áp dụng bản vá MIME upload Google Drive (fix-upload-drive.sh)...${NC}"
 curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh?nocache=$RANDOM" | bash -s || true
 
-# 9. Chỉ vá lỗi bộ gõ nếu máy đang dùng IBus-Bamboo (bỏ qua Fcitx5 / VDKey / NgoSen)
+# 9. Chạy script tích hợp Add-in Đổi số thành chữ cho WPS 12
+echo -e "${CYAN}[INFO] Tích hợp Add-in Đổi số thành chữ (doiso-wps.sh)...${NC}"
+curl -fsSL "https://raw.githubusercontent.com/longnguyen2026/office/main/doiso-wps.sh?nocache=$RANDOM" | bash -s || true
+
+# 10. Chỉ vá lỗi bộ gõ nếu máy đang dùng IBus-Bamboo (bỏ qua Fcitx5 / VDKey / NgoSen)
 IS_FCITX5=false
 if pgrep -x "fcitx5" >/dev/null 2>&1 || dpkg -l 2>/dev/null | grep -qE '^ii\s+(fcitx5|vdkey|fcitx5-ngosen|fcitx5-lotus)'; then
     IS_FCITX5=true
@@ -180,17 +124,19 @@ if [ "$IS_FCITX5" = false ] && (dpkg -l 2>/dev/null | grep -qw "ibus-bamboo" || 
         fi
     done
 
-    if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
-        USER_ID=$(id -u "$REAL_USER")
-        if [ -S "/run/user/$USER_ID/bus" ]; then
-            sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" ibus restart 2>/dev/null || true
+    for USER_HOME in /home/*; do
+        [ -d "$USER_HOME" ] || continue
+        TARGET_USER=$(basename "$USER_HOME")
+        USER_ID=$(id -u "$TARGET_USER" 2>/dev/null || true)
+        if [ -n "$USER_ID" ] && [ -S "/run/user/$USER_ID/bus" ]; then
+            sudo -u "$TARGET_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" ibus restart 2>/dev/null || true
         fi
-    fi
+    done
 else
     echo -e "${CYAN}[INFO] Hệ thống đang dùng Fcitx5/VDKey hoặc không dùng IBus, bỏ qua bước vá IBus.${NC}"
 fi
 
-# 10. Cập nhật lại toàn bộ cache ứng dụng, MIME và Icon theme
+# 11. Cập nhật lại toàn bộ cache ứng dụng, MIME và Icon theme
 echo -e "${CYAN}[INFO] Cập nhật lại cache ứng dụng, MIME và toàn bộ Icon theme...${NC}"
 update-desktop-database /usr/share/applications 2>/dev/null || true
 update-mime-database /usr/share/mime 2>/dev/null || true
@@ -199,4 +145,4 @@ for theme_dir in /usr/share/icons/*; do
     [ -d "$theme_dir" ] && gtk-update-icon-cache -f -t "$theme_dir" 2>/dev/null || true
 done
 
-echo -e "${GREEN}[SUCCESS] Hoàn tất cài đặt và cấu hình WPS Office!${NC}"
+echo -e "${GREEN}[SUCCESS] Hoàn tất cài đặt và cấu hình toàn diện WPS Office 12!${NC}"
