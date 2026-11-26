@@ -30,3 +30,8 @@ Khi cài đặt WPS Office trên Linux, phần mềm tự tạo MIME type độc
 ```bash
 curl -fsSL https://raw.githubusercontent.com/longnguyen2026/office/main/fix-upload-drive.sh | sudo bash
 ````
+
+## Fix lỗi Onlyoffice không thấy máy in 
+````bash
+curl -sL https://raw.githubusercontent.com/longnguyen2026/printer/main/in-onlyoffice.sh | sudo bash
+````
